@@ -5,7 +5,7 @@ import json
 import os
 
 # Gemini API 키 설정
-genai.configure(api_key="AIzaSyCXhDJgQBldkqjGUKLvZHkJELq25ntgImw")
+genai.configure(api_key="")
 
 def generate_diary_content(crop, weather, temperature, humidity, issues, work):
     prompt = f"""
