@@ -29,8 +29,8 @@ app = FastAPI(
 )
 
 # 환경 변수 설정
-GOOGLE_API_KEY = ""  # 여기에 Google Generative AI API 키를 입력하세요
-NGROK_AUTH_TOKEN = ""  # 여기에 Ngrok 인증 토큰을 입력하세요
+GOOGLE_API_KEY = ""  
+NGROK_AUTH_TOKEN = ""
 SAVE_PATH = "./farm_diary_outputs"
 os.makedirs(SAVE_PATH, exist_ok=True)
 
