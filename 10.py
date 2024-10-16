@@ -1,5 +1,5 @@
 import nest_asyncio
-from pyngrok import ngrok
+from pyngrok import ngrok  
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
@@ -9,7 +9,7 @@ import torch
 from PIL import Image
 import io
 import google.generativeai as genai
-from diffusers import StableDiffusionPipeline, EulerAncestralDiscreteScheduler
+from diffusers import StableDiffusion3Pipeline, EulerAncestralDiscreteScheduler
 from typing import Optional
 import logging
 import asyncio
@@ -17,7 +17,7 @@ from deep_translator import GoogleTranslator
 import boto3
 from botocore.exceptions import ClientError
 
-# 로깅 설정
+# 로긋 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ s3 = boto3.client(
     region_name=AWS_REGION
 )
 
-# Stable Diffusion 모델 (지연 초기화)
+# Stable Diffusion 3 모델 (짱 초기화)
 pipe = None
 
 # 번역기 설정
@@ -74,10 +74,9 @@ def initialize_stable_diffusion():
     global pipe
     if pipe is None:
         try:
-            pipe = StableDiffusionPipeline.from_pretrained(
-                "dreamlike-art/dreamlike-photoreal-2.0",
-                torch_dtype=torch.float16,
-                safety_checker=None
+            pipe = StableDiffusion3Pipeline.from_pretrained(
+                "stabilityai/stable-diffusion-3-medium-diffusers",  # Stable Diffusion 3 Medium 모델 사용
+                torch_dtype=torch.float16
             )
             pipe.scheduler = EulerAncestralDiscreteScheduler.from_config(pipe.scheduler.config)
             if torch.cuda.is_available():
@@ -117,7 +116,7 @@ def generate_enhanced_prompt(entry: DiaryEntry) -> str:
             "details": "traditional grape vine cultivation",
             "category": "fruit vineyard"
         },
-        "샤인머스캣": {
+        "사인머스켓": {
             "name": "premium Shine Muscat grape vineyard",
             "details": "high-end green grape clusters on sophisticated trellis system",
             "category": "fruit vineyard"
@@ -187,7 +186,7 @@ def generate_enhanced_prompt(entry: DiaryEntry) -> str:
             "category": "special crop"
         },
 
-        # 화훼류
+        # 화회류
         "장미": {
             "name": "rose greenhouse",
             "details": "commercial rose cultivation with blooming flowers",
@@ -202,14 +201,14 @@ def generate_enhanced_prompt(entry: DiaryEntry) -> str:
 
     # 날씨 상태 사전
     weather_dict = {
-        "맑음": "clear sunny day with optimal natural lighting",
-        "흐림": "overcast sky creating soft, diffused lighting",
+        "매일": "clear sunny day with optimal natural lighting",
+        "흘리버리": "overcast sky creating soft, diffused lighting",
         "비": "gentle rainfall with wet soil conditions",
         "가랑비": "misty drizzle creating moisture in the air",
         "눈": "pristine snowy conditions in winter agricultural scene",
-        "안개": "morning mist creating atmospheric agricultural scene",
-        "흐리고 비": "overcast with steady rainfall",
-        "맑은 후 흐림": "partly cloudy with intermittent sunlight",
+        "안가": "morning mist creating atmospheric agricultural scene",
+        "흘리고 비": "overcast with steady rainfall",
+        "매일 후 흘리버리": "partly cloudy with intermittent sunlight",
         "강풍": "windy conditions affecting crop movement",
         "서리": "morning frost covering the agricultural landscape"
     }
@@ -225,7 +224,7 @@ def generate_enhanced_prompt(entry: DiaryEntry) -> str:
         # 날씨 정보 가져오기
         weather_translated = weather_dict.get(entry.weather, translator.translate(entry.weather))
 
-        # 작업 내용과 특이사항 번역
+        # 작업 내용과 특이상 번역
         translated_work = translator.translate(entry.work)
         translated_issues = translator.translate(entry.issues)
 
@@ -261,27 +260,27 @@ def generate_enhanced_prompt(entry: DiaryEntry) -> str:
 
 def generate_diary_content(entry: DiaryEntry) -> str:
     prompt = f"""
-    전문 농업 컨설턴트의 관점에서 다음 정보를 바탕으로 상세한 농가 일지를 작성해주세요:
+    전문 농업 콜셀트의 관점에서 다음 정보를 모두해 상세한 농가 일지를 작성해주세요:
 
     작성일시: {datetime.now().strftime('%Y년 %m월 %d일 %H시')}
 
     기본 정보:
     - 작물: {entry.crop}
-    - 기상 상황: {entry.weather}
+    - 기상 상태: {entry.weather}
     - 온도: {entry.temperature}°C
-    - 습도: {entry.humidity}%
+    - 승도: {entry.humidity}%
 
     주요 사항:
-    - 특이사항: {entry.issues}
+    - 특이상: {entry.issues}
     - 작업내용: {entry.work}
 
     다음 항목들을 포함해 전문적으로 작성해주세요:
-    1. 작물 생육 상태 분석
+    1. 작물 생우 상태 분석
     2. 환경 요인 영향 평가
-    3. 수행된 작업의 적절성 평가
-    4. 향후 1주일간의 관리 권장사항
-    5. 예상되는 문제점과 대응 방안
-    6. 수확량 예측 및 품질 전망
+    3. 수행된 작업의 적적성 평가
+    4. 하우 1주일간의 관리 권장사항
+    5. 예상되는 문제점과 대여 방안
+    6. 수환량 예측 및 품질 전망
     """
 
     try:
