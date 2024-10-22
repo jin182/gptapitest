@@ -1,6 +1,5 @@
 !pip install fastapi uvicorn pyngrok google-generativeai nest-asyncio
 
-
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import google.generativeai as genai
@@ -49,7 +48,7 @@ def analyze_legal_case(text):
     6. 사건의 예상 결과 및 권고 사항:
         - 이 사건의 예상 결과를 간략히 제시하고, 이를 바탕으로 당사자에게 줄 수 있는 법적 권고 사항을 설명해주세요.
         - 권고 사항은 법적 대응 방안, 잠재적 합의 가능성, 추가적인 법적 조치 등을 포함해주세요.
-    
+
     각 항목에 대해 명확하고 간결한 형식으로 설명해 주세요:
     - 적용되는 법률: (여기에 설명)
     - 주요 법적 쟁점: (여기에 설명)
@@ -87,4 +86,3 @@ if __name__ == "__main__":
 
     # Run the FastAPI app
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
