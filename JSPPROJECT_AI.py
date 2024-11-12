@@ -7,82 +7,187 @@ from pyngrok import ngrok
 import uvicorn
 import logging
 import nest_asyncio
+from typing import List, Dict
+import json
+import re
 
-# Set up logging
+# 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# Set up Google API
-GOOGLE_API_KEY = ""
+# Google API 설정
+GOOGLE_API_KEY = "AIzaSyCXhDJgQBldkqjGUKLvZHkJELq25ntgImw"
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# Set up ngrok
-ngrok.set_auth_token("")
+# ngrok 설정
+ngrok.set_auth_token("2j27vD2VtJOyWNLlG1Hhe6aUTVl_782M5FWdcUq833RhR4ZhE")
 
 class TextData(BaseModel):
     text: str
+    analysis_type: str = "general"  # general, specific, comparison, or research
 
-def analyze_legal_case(text):
+# 법률 분류 시스템
+LEGAL_CATEGORIES = {
+    "헌법": "대한민국 헌법",
+    "민사법": ["민법", "민사소송법", "민사집행법", "가사소송법"],
+    "형사법": ["형법", "형사소송법", "보안관찰법"],
+    "상사법": ["상법", "어음법", "수표법", "유한회사법"],
+    "행정법": ["행정법", "행정소송법", "행정심판법"],
+    "사회법": ["노동법", "근로기준법", "노동조합법", "사회보장법"],
+    "경제법": ["공정거래법", "소비자보호법", "약관규제법"],
+    "국제법": ["국제사법", "국제거래법"],
+    "특별법": [
+        "청소년 보호법",
+        "환경법",
+        "교육법",
+        "의료법",
+        "건축법",
+        "도로교통법",
+        "식품위생법",
+        "정보통신망법"
+    ]
+}
+
+def generate_comprehensive_prompt(text: str, analysis_type: str) -> str:
+    """분석 유형에 따른 맞춤형 프롬프트 생성"""
+
+    base_prompt = f"""
+분석할 내용:
+{text}
+
+당신은 대한민국의 모든 법률에 대해 깊이 있는 지식을 가진 최고의 법률 전문가입니다.
+다음 지침에 따라 철저하고 전문적인 분석을 제공해 주세요:
+
+1. 법적 기반:
+   - 대한민국 헌법
+   - 모든 관련 법률과 시행령
+   - 관련 판례와 법원 해석
+   - 관련 학설과 법리
+
+2. 분석의 범위:
+   - 관련된 모든 법률 검토
+   - 법률 간의 상호관계 분석
+   - 판례와 학설의 입장 검토
+   - 실무적 적용 방안
+"""
+
+    if analysis_type == "general":
+        base_prompt += """
+3. 일반 분석 요구사항:
+   - 관련된 모든 법률 분야 포괄적 검토
+   - 주요 법적 쟁점 도출
+   - 적용 가능한 모든 법률 조항 분석
+   - 실무적 권고사항 제시
+"""
+    elif analysis_type == "specific":
+        base_prompt += """
+3. 특정 분야 심층 분석:
+   - 해당 분야 전문 법률 검토
+   - 관련 특별법 분석
+   - 판례 동향 분석
+   - 구체적 해결방안 제시
+"""
+    elif analysis_type == "comparison":
+        base_prompt += """
+3. 비교법적 분석:
+   - 관련 법률 간 비교
+   - 상충되는 법률 검토
+   - 법적 우선순위 분석
+   - 조화로운 해석 방안
+"""
+    elif analysis_type == "research":
+        base_prompt += """
+3. 학술적 분석:
+   - 법리적 쟁점 연구
+   - 학설 검토
+   - 입법 목적 분석
+   - 개선방안 제시
+"""
+
+    base_prompt += """
+4. 결과 제시 형식:
+   A. 관련 법률 체계
+      - 적용되는 모든 법률 나열
+      - 법률 간 관계 설명
+      - 특별법과 일반법 구분
+
+   B. 법적 쟁점 분석
+      - 주요 쟁점 도출
+      - 관련 법조문 분석
+      - 판례 및 학설 검토
+
+   C. 실무적 검토
+      - 구체적 적용 방안
+      - 예상되는 법적 결과
+      - 대응 전략 제시
+
+   D. 종합 의견
+      - 법적 판단
+      - 권고사항
+      - 추가 고려사항
+
+5. 특별 고려사항:
+   - 최신 법령 개정 사항 반영
+   - 헌법적 가치 고려
+   - 법률 간 충돌 검토
+   - 실무적 적용가능성 검토
+"""
+
+    return base_prompt
+
+def analyze_legal_case(text: str, analysis_type: str = "general"):
     model = genai.GenerativeModel('gemini-pro')
-    prompt = f"""분석해야 할 법률 사건:
-    {text}
 
-    이 사건에 대해 다음 정보를 제공해주세요:
-    1. 적용되는 법률:
-        - 이 사건과 관련된 모든 법률 조항들을 간단히 나열하고, 각각이 어떻게 적용되는지 설명해주세요.
-        - 법률 조항의 번호와 제목을 명시하고, 해당 조항이 사건에 어떤 영향을 미치는지 구체적으로 설명해주세요.
-    2. 주요 법적 쟁점:
-        - 이 사건에서 다투어지는 핵심 법적 쟁점들을 요약하고, 각각의 쟁점이 법률적으로 어떤 의미를 가지는지 설명해주세요.
-        - 각 쟁점에 대한 당사자의 입장과 이에 대한 법적 논거를 명확하게 제시해주세요.
-    3. 잠재적 위험:
-        - 사건 당사자들이 겪을 수 있는 잠재적 법적 위험이나 책임을 설명하고, 가능한 시나리오를 제시해주세요.
-        - 각 시나리오에 대해 발생 가능한 법적 결과와 그에 따른 영향을 설명해주세요.
-    4. 유사 판례 (있다면):
-        - 이 사건과 유사한 판례들을 예시로 들어주시고, 해당 판례들이 이 사건과 어떻게 연관될 수 있는지 설명해주세요.
-        - 판례의 이름, 번호, 결정 내용 등을 포함하여 설명하고, 이 판례가 현재 사건에 주는 시사점을 제시해주세요.
-    5. 기타 관련 법률 사항 (해당되는 경우):
-        - 이 사건과 관련된 모든 법률(청소년 기본법 포함)에 대한 사항을 설명해주세요.
-        - 각 법률이 사건에 미치는 영향과 적용 여부를 설명해주세요.
-    6. 사건의 예상 결과 및 권고 사항:
-        - 이 사건의 예상 결과를 간략히 제시하고, 이를 바탕으로 당사자에게 줄 수 있는 법적 권고 사항을 설명해주세요.
-        - 권고 사항은 법적 대응 방안, 잠재적 합의 가능성, 추가적인 법적 조치 등을 포함해주세요.
-
-    각 항목에 대해 명확하고 간결한 형식으로 설명해 주세요:
-    - 적용되는 법률: (여기에 설명)
-    - 주요 법적 쟁점: (여기에 설명)
-    - 잠재적 위험: (여기에 설명)
-    - 유사 판례: (여기에 설명)
-    - 기타 관련 법률 사항: (여기에 설명)
-    - 사건의 예상 결과 및 권고 사항: (여기에 설명)
-    """
     try:
-        response = model.generate_content(prompt)
+        prompt = generate_comprehensive_prompt(text, analysis_type)
+
+        safety_config = {
+            "HARM_CATEGORY_DANGEROUS_CONTENT": "block_none",
+            "HARM_CATEGORY_HARASSMENT": "block_none",
+            "HARM_CATEGORY_HATE_SPEECH": "block_none",
+            "HARM_CATEGORY_SEXUALLY_EXPLICIT": "block_none",
+        }
+
+        generation_config = {
+            "temperature": 0.7,
+            "top_p": 0.8,
+            "top_k": 40,
+            "max_output_tokens": 4096,
+        }
+
+        response = model.generate_content(
+            prompt,
+            safety_settings=safety_config,
+            generation_config=generation_config
+        )
+
         return response.text
+
     except Exception as e:
-        logger.error(f"Generative AI 응답 중 오류 발생: {str(e)}")
-        raise HTTPException(status_code=500, detail="AI 모델을 통해 분석 중 오류가 발생했습니다.")
+        logger.error(f"AI 분석 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail="법률 분석 중 오류가 발생했습니다.")
 
 @app.post("/analyze")
 async def analyze_text(data: TextData):
-    logger.info(f"Received request with text: {data.text}")
+    logger.info(f"분석 요청 수신: {data.text[:100]}...")
     try:
-        analysis_result = analyze_legal_case(data.text)
-        logger.info("Analysis completed successfully")
+        analysis_result = analyze_legal_case(data.text, data.analysis_type)
+        logger.info("분석 완료")
         return {"result": analysis_result}
     except Exception as e:
-        logger.error(f"Error during analysis: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"An error occurred during analysis: {str(e)}")
+        logger.error(f"분석 중 오류: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"분석 중 오류 발생: {str(e)}")
+
+@app.get("/legal-categories")
+async def get_legal_categories():
+    """법률 분류 체계 조회"""
+    return LEGAL_CATEGORIES
 
 if __name__ == "__main__":
-    # Apply nest_asyncio to allow running uvicorn in a notebook environment
     nest_asyncio.apply()
-
-    # Start ngrok tunnel
     public_url = ngrok.connect(8000)
-    print( public_url)
-    logger.info(f"Public URL: {public_url.public_url}")  # 수정된 부분: .public_url 추가
-
-    # Run the FastAPI app
+    print(public_url)
+    logger.info(f"Public URL: {public_url.public_url}")
     uvicorn.run(app, host="0.0.0.0", port=8000)
